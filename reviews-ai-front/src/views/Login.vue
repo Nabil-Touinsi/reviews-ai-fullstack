@@ -9,13 +9,18 @@ const error = ref(null);
 const router = useRouter();
 
 const login = async () => {
+  error.value = null;
+
   try {
     const res = await api.post("/login", {
       email: email.value,
       password: password.value,
     });
 
+    // Stockage auth
     localStorage.setItem("token", res.data.token);
+    localStorage.setItem("user", JSON.stringify(res.data.user));
+
     router.push("/dashboard");
   } catch (e) {
     error.value = "Identifiants incorrects";

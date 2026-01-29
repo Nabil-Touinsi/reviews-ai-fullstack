@@ -7,6 +7,18 @@ const loading = ref(true);
 const error = ref(null);
 const q = ref("");
 
+const deletingId = ref(null);
+
+// User + Admin (stocké au login)
+const user = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem("user"));
+  } catch {
+    return null;
+  }
+});
+const isAdmin = computed(() => user.value?.role === "admin");
+
 const fetchReviews = async () => {
   loading.value = true;
   error.value = null;
@@ -20,6 +32,37 @@ const fetchReviews = async () => {
     error.value = "Impossible de charger la liste des reviews.";
   } finally {
     loading.value = false;
+  }
+};
+
+const deleteReview = async (id) => {
+  if (!isAdmin.value) return;
+
+  const ok = window.confirm(
+    `Supprimer la review #${id} ?\nCette action est réservée à un admin et est irréversible.`
+  );
+  if (!ok) return;
+
+  deletingId.value = id;
+  error.value = null;
+
+  try {
+    await api.delete(`/reviews/${id}`);
+    // Retire localement pour feedback immédiat
+    items.value = items.value.filter((r) => r.id !== id);
+  } catch (e) {
+    console.error(e);
+    const status = e?.response?.status;
+
+    if (status === 403) {
+      error.value = "Accès refusé : la suppression est réservée aux administrateurs.";
+    } else if (status === 404) {
+      error.value = "Review introuvable (déjà supprimée ?).";
+    } else {
+      error.value = "Erreur lors de la suppression de la review.";
+    }
+  } finally {
+    deletingId.value = null;
   }
 };
 
@@ -59,7 +102,13 @@ onMounted(fetchReviews);
 <template>
   <div class="page">
     <div class="page__header">
-      <h1>Reviews</h1>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <h1>Reviews</h1>
+
+        <div v-if="isAdmin" class="muted">
+          Mode <b>ADMIN</b> : tu peux supprimer des reviews.
+        </div>
+      </div>
 
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <input
@@ -90,7 +139,8 @@ onMounted(fetchReviews);
       <div v-else-if="!filtered.length" class="card">
         <div class="card__label">Aucun résultat</div>
         <div class="muted">
-          Essaie un autre mot-clé (ex: <span class="code">positive</span>, <span class="code">delivery</span>, etc.)
+          Essaie un autre mot-clé (ex: <span class="code">positive</span>,
+          <span class="code">delivery</span>, etc.)
         </div>
       </div>
 
@@ -103,6 +153,9 @@ onMounted(fetchReviews);
             <th style="width:140px;">Sentiment</th>
             <th style="width:90px;">Score</th>
             <th style="width:220px;">Date</th>
+
+            <!-- Colonne actions visible uniquement admin -->
+            <th v-if="isAdmin" style="width:140px;">Actions</th>
           </tr>
         </thead>
 
@@ -114,7 +167,11 @@ onMounted(fetchReviews);
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <div>{{ r.content }}</div>
 
-                <div v-if="r.topics?.length" class="muted" style="display:flex; gap:6px; flex-wrap:wrap;">
+                <div
+                  v-if="r.topics?.length"
+                  class="muted"
+                  style="display:flex; gap:6px; flex-wrap:wrap;"
+                >
                   <span class="badge" v-for="t in r.topics" :key="t">{{ t }}</span>
                 </div>
               </div>
@@ -132,6 +189,17 @@ onMounted(fetchReviews);
 
             <td class="muted">
               {{ formatDate(r.created_at) }}
+            </td>
+
+            <!-- Actions admin -->
+            <td v-if="isAdmin">
+              <button
+                class="btn"
+                :disabled="deletingId === r.id"
+                @click="deleteReview(r.id)"
+              >
+                {{ deletingId === r.id ? "Suppression..." : "Supprimer" }}
+              </button>
             </td>
           </tr>
         </tbody>

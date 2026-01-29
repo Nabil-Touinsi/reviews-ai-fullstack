@@ -1,4 +1,4 @@
-# Echo Reviews — AI‑Powered Review Intelligence Platform
+# Echo Reviews  AI‑Powered Review Intelligence Platform
 
 Echo Reviews is a **full‑stack AI application** that allows organizations to **analyze, store, and monitor user reviews** in real time.  
 It combines **NLP sentiment analysis**, **topic extraction**, and a **modern analytics dashboard** to transform raw feedback into actionable insights.

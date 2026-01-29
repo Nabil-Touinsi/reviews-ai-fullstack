@@ -36,6 +36,7 @@ class ReviewController extends Controller
             'sentiment' => $analysis['sentiment'],
             'score'     => $analysis['score'],
             'topics'    => $analysis['topics'],
+            'keywords_detected' => $analysis['keywords_detected'] ?? [],
         ]);
 
         return response()->json($review, 201);
@@ -65,6 +66,7 @@ public function update(Request $request, Review $review, ReviewAnalyzerService $
         'sentiment' => $analysis['sentiment'],
         'score'     => $analysis['score'],
         'topics'    => $analysis['topics'],
+        'keywords_detected' => $analysis['keywords_detected'] ?? [],
     ]);
 
     return response()->json($review);

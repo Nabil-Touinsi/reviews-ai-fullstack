@@ -27,8 +27,12 @@ class ReviewAnalyzerService
     {
         $t = mb_strtolower($text);
 
-        $pos = $this->countMatches($t, $this->positiveWords);
-        $neg = $this->countMatches($t, $this->negativeWords);
+        // ✅ mots trouvés (explicabilité)
+        $matchedPos = $this->findMatches($t, $this->positiveWords);
+        $matchedNeg = $this->findMatches($t, $this->negativeWords);
+
+        $pos = count($matchedPos);
+        $neg = count($matchedNeg);
 
         // Sentiment (simple)
         $sentiment = 'neutral';
@@ -40,34 +44,47 @@ class ReviewAnalyzerService
         $lenBonus = min(10, intdiv(mb_strlen($t), 50)); // +0..10
         $score = max(0, min(100, $base + $lenBonus));
 
-        // Topics (max 3)
+        // Topics (max 3) + keywords topics détectés
         $topics = [];
+        $matchedTopicKeywords = [];
+
         foreach ($this->topicKeywords as $topic => $keywords) {
             foreach ($keywords as $kw) {
                 if (str_contains($t, $kw)) {
                     $topics[] = $topic;
+                    $matchedTopicKeywords[] = $kw; // ✅ indice concret détecté
                     break;
                 }
             }
         }
+
         $topics = array_values(array_unique($topics));
         $topics = array_slice($topics, 0, 3);
+
+        // ✅ keywords_detected : fusion + unique + limite (évite spam)
+        $keywordsDetected = array_values(array_unique(array_merge(
+            $matchedPos,
+            $matchedNeg,
+            $matchedTopicKeywords
+        )));
+        $keywordsDetected = array_slice($keywordsDetected, 0, 12);
 
         return [
             'sentiment' => $sentiment,
             'score'     => $score,
             'topics'    => $topics,
+            'keywords_detected' => $keywordsDetected,
         ];
     }
 
-    private function countMatches(string $text, array $words): int
+    private function findMatches(string $text, array $words): array
     {
-        $count = 0;
+        $found = [];
         foreach ($words as $w) {
             if (str_contains($text, $w)) {
-                $count++;
+                $found[] = $w;
             }
         }
-        return $count;
+        return array_values(array_unique($found));
     }
 }

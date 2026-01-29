@@ -10,16 +10,19 @@ class Review extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'content',
-        'sentiment',
-        'score',
-        'topics',
-    ];
+    'user_id',
+    'content',
+    'sentiment',
+    'score',
+    'topics',
+    'keywords_detected',
+];
 
-    protected $casts = [
-        'topics' => 'array',
-    ];
+protected $casts = [
+    'topics' => 'array',
+    'keywords_detected' => 'array',
+];
+
 
     public function user()
     {

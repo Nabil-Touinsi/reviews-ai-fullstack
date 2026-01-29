@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AnalyzeController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AdminController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,12 +43,6 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Suppression globale des avis
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
-    // Statistiques admin
-    Route::get('/admin/stats', function () {
-        return response()->json([
-            'message' => 'Admin access granted',
-            'users_count' => \App\Models\User::count(),
-            'reviews_count' => \App\Models\Review::count(),
-        ]);
-    });
+    // Statistiques + historique admin
+    Route::get('/admin/stats', [AdminController::class, 'stats']);
 });

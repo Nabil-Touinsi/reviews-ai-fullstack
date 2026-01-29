@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import api from "../services/api";
+import { notifySuccess, notifyError } from "../services/notify";
 
 const text = ref("");
 
@@ -8,8 +9,6 @@ const analyzing = ref(false);
 const saving = ref(false);
 
 const analysis = ref(null);
-const error = ref(null);
-const success = ref(null);
 
 const canAnalyze = computed(() => text.value.trim().length >= 3);
 const canSave = computed(() => text.value.trim().length >= 3 && !saving.value);
@@ -18,11 +17,6 @@ const badgeClass = (s) => {
   if (s === "positive") return "badge badge--positive";
   if (s === "negative") return "badge badge--negative";
   return "badge badge--neutral";
-};
-
-const resetMessages = () => {
-  error.value = null;
-  success.value = null;
 };
 
 const examplesBySentiment = {
@@ -52,7 +46,6 @@ const examplesBySentiment = {
 const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const fillExample = (type = "random") => {
-  resetMessages();
   analysis.value = null;
 
   if (type === "random") {
@@ -66,11 +59,10 @@ const fillExample = (type = "random") => {
 };
 
 const runAnalyze = async () => {
-  resetMessages();
   analysis.value = null;
 
   if (!canAnalyze.value) {
-    error.value = "Le texte doit faire au moins 3 caractères.";
+    notifyError("Le texte doit faire au moins 3 caractères.");
     return;
   }
 
@@ -78,35 +70,34 @@ const runAnalyze = async () => {
   try {
     const res = await api.post("/analyze", { text: text.value });
     analysis.value = res.data;
+    notifySuccess("Analyse terminée ✅", 2000);
   } catch (e) {
     console.error(e);
-    error.value = "Erreur pendant l'analyse.";
+    notifyError("Erreur pendant l'analyse.");
   } finally {
     analyzing.value = false;
   }
 };
 
 const saveReview = async () => {
-  resetMessages();
-
   if (!canAnalyze.value) {
-    error.value = "Le texte doit faire au moins 3 caractères.";
+    notifyError("Le texte doit faire au moins 3 caractères.");
     return;
   }
 
   saving.value = true;
   try {
     await api.post("/reviews", { content: text.value });
-    success.value = "Review enregistrée ✅";
+    notifySuccess("Review enregistrée ✅");
     text.value = "";
     analysis.value = null;
   } catch (e) {
     console.error(e);
     const status = e?.response?.status;
 
-    if (status === 401) error.value = "Non autorisé (token manquant). Reconnecte-toi.";
-    else if (status === 422) error.value = "Validation échouée (contenu vide ou trop court).";
-    else error.value = "Impossible d'enregistrer la review.";
+    if (status === 401) notifyError("Non autorisé. Reconnecte-toi.");
+    else if (status === 422) notifyError("Validation échouée (texte trop court).");
+    else notifyError("Impossible d'enregistrer la review.");
   } finally {
     saving.value = false;
   }
@@ -115,7 +106,6 @@ const saveReview = async () => {
 const clearAll = () => {
   text.value = "";
   analysis.value = null;
-  resetMessages();
 };
 </script>
 
@@ -134,7 +124,7 @@ const clearAll = () => {
     </div>
 
     <div class="grid">
-      <!-- Input -->
+      <!-- INPUT -->
       <div class="card card--span3">
         <div class="card__label">Texte à analyser</div>
 
@@ -151,12 +141,9 @@ const clearAll = () => {
 
           <span class="muted" v-if="!canAnalyze">Min 3 caractères</span>
         </div>
-
-        <p v-if="error" class="error" style="margin-top:12px;">{{ error }}</p>
-        <p v-if="success" style="margin-top:12px;">{{ success }}</p>
       </div>
 
-      <!-- Result -->
+      <!-- RESULT -->
       <div class="card card--span3">
         <div class="card__label">Résultat</div>
 
@@ -165,6 +152,7 @@ const clearAll = () => {
         </div>
 
         <div v-else class="result">
+          <!-- Sentiment + score -->
           <div class="result__row">
             <span :class="badgeClass(analysis.sentiment)">
               {{ analysis.sentiment }}
@@ -175,6 +163,7 @@ const clearAll = () => {
             </div>
           </div>
 
+          <!-- Topics -->
           <div class="card__label" style="margin-top:14px;">Topics</div>
 
           <div v-if="!analysis.topics?.length" class="muted" style="margin-top:8px;">
@@ -184,6 +173,23 @@ const clearAll = () => {
           <div v-else class="chips">
             <span v-for="t in analysis.topics" :key="t" class="chip">
               {{ t }}
+            </span>
+          </div>
+
+          <!-- IA EXPLICABLE -->
+          <div class="card__label" style="margin-top:14px;">Pourquoi ?</div>
+
+          <div v-if="!analysis.keywords_detected?.length" class="muted" style="margin-top:8px;">
+            Aucun mot-clé explicatif détecté.
+          </div>
+
+          <div v-else class="chips" style="margin-top:12px;">
+            <span
+              v-for="k in analysis.keywords_detected"
+              :key="k"
+              class="chip chip--why"
+            >
+              {{ k }}
             </span>
           </div>
         </div>
@@ -205,9 +211,8 @@ const clearAll = () => {
   margin-top: 12px;
 }
 
-.result {
-  margin-top: 12px;
-}
+.result { margin-top: 12px; }
+
 .result__row {
   display: flex;
   align-items: center;
@@ -215,26 +220,34 @@ const clearAll = () => {
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .score {
   display: flex;
   align-items: baseline;
   gap: 6px;
 }
+
 .score__value {
   font-size: 34px;
   font-weight: 900;
 }
+
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 12px;
 }
+
 .chip {
   padding: 8px 10px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 13px;
+}
+
+.chip--why {
+  background: rgba(255, 255, 255, 0.06);
 }
 </style>

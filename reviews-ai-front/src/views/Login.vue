@@ -2,15 +2,13 @@
 import { ref } from "vue";
 import api from "../services/api";
 import { useRouter } from "vue-router";
+import { notifySuccess, notifyError } from "../services/notify";
 
 const email = ref("");
 const password = ref("");
-const error = ref(null);
 const router = useRouter();
 
 const login = async () => {
-  error.value = null;
-
   try {
     const res = await api.post("/login", {
       email: email.value,
@@ -21,9 +19,16 @@ const login = async () => {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("user", JSON.stringify(res.data.user));
 
+    notifySuccess("Connexion réussie ✅");
     router.push("/dashboard");
   } catch (e) {
-    error.value = "Identifiants incorrects";
+    const status = e?.response?.status;
+
+    if (status === 401) {
+      notifyError("Identifiants incorrects.");
+    } else {
+      notifyError("Erreur de connexion. Réessaie.");
+    }
   }
 };
 </script>
@@ -36,6 +41,4 @@ const login = async () => {
     <input v-model="password" type="password" placeholder="Mot de passe" />
     <button>Se connecter</button>
   </form>
-
-  <p v-if="error" style="color:red">{{ error }}</p>
 </template>

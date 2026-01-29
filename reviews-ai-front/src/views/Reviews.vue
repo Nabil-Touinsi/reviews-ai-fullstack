@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import api from "../services/api";
+import { notifySuccess, notifyError } from "../services/notify";
 
 const items = ref([]);
 const loading = ref(true);
@@ -25,18 +26,23 @@ const fetchReviews = async () => {
 
   try {
     const res = await api.get("/reviews");
-    // On accepte soit { data: [...] } soit [...]
     items.value = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+    // Optionnel: toast info
+    // notifySuccess("Liste mise à jour ✅", 2000);
   } catch (e) {
     console.error(e);
     error.value = "Impossible de charger la liste des reviews.";
+    notifyError("Impossible de charger les reviews.");
   } finally {
     loading.value = false;
   }
 };
 
 const deleteReview = async (id) => {
-  if (!isAdmin.value) return;
+  if (!isAdmin.value) {
+    notifyError("Action réservée aux administrateurs.");
+    return;
+  }
 
   const ok = window.confirm(
     `Supprimer la review #${id} ?\nCette action est réservée à un admin et est irréversible.`
@@ -48,18 +54,22 @@ const deleteReview = async (id) => {
 
   try {
     await api.delete(`/reviews/${id}`);
-    // Retire localement pour feedback immédiat
     items.value = items.value.filter((r) => r.id !== id);
+
+    notifySuccess(`Review #${id} supprimée ✅`);
   } catch (e) {
     console.error(e);
     const status = e?.response?.status;
 
     if (status === 403) {
       error.value = "Accès refusé : la suppression est réservée aux administrateurs.";
+      notifyError("Accès refusé : réservé aux administrateurs.");
     } else if (status === 404) {
       error.value = "Review introuvable (déjà supprimée ?).";
+      notifyError("Review introuvable (déjà supprimée ?).");
     } else {
       error.value = "Erreur lors de la suppression de la review.";
+      notifyError("Erreur lors de la suppression.");
     }
   } finally {
     deletingId.value = null;
@@ -80,10 +90,15 @@ const filtered = computed(() => {
     const content = (r.content ?? "").toLowerCase();
     const sentiment = (r.sentiment ?? "").toLowerCase();
     const topics = Array.isArray(r.topics) ? r.topics.join(" ").toLowerCase() : "";
+    const keywords = Array.isArray(r.keywords_detected)
+      ? r.keywords_detected.join(" ").toLowerCase()
+      : "";
+
     return (
       content.includes(query) ||
       sentiment.includes(query) ||
       topics.includes(query) ||
+      keywords.includes(query) ||
       String(r.id ?? "").includes(query)
     );
   });
@@ -113,7 +128,7 @@ onMounted(fetchReviews);
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <input
           v-model="q"
-          placeholder="Rechercher (id, texte, sentiment, topics...)"
+          placeholder="Rechercher (id, texte, sentiment, topics, mots-clés...)"
           style="width:320px; max-width: 100%;"
         />
 
@@ -127,7 +142,6 @@ onMounted(fetchReviews);
     <p v-else-if="error" class="error">{{ error }}</p>
 
     <div v-else>
-      <!-- Empty state -->
       <div v-if="!items.length" class="card">
         <div class="card__label">Aucune review</div>
         <div class="muted">
@@ -135,16 +149,14 @@ onMounted(fetchReviews);
         </div>
       </div>
 
-      <!-- No results after filter -->
       <div v-else-if="!filtered.length" class="card">
         <div class="card__label">Aucun résultat</div>
         <div class="muted">
           Essaie un autre mot-clé (ex: <span class="code">positive</span>,
-          <span class="code">delivery</span>, etc.)
+          <span class="code">delivery</span>, <span class="code">super</span>, etc.)
         </div>
       </div>
 
-      <!-- Table -->
       <table v-else class="table">
         <thead>
           <tr>
@@ -153,8 +165,6 @@ onMounted(fetchReviews);
             <th style="width:140px;">Sentiment</th>
             <th style="width:90px;">Score</th>
             <th style="width:220px;">Date</th>
-
-            <!-- Colonne actions visible uniquement admin -->
             <th v-if="isAdmin" style="width:140px;">Actions</th>
           </tr>
         </thead>
@@ -167,12 +177,24 @@ onMounted(fetchReviews);
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <div>{{ r.content }}</div>
 
+                <!-- Topics -->
                 <div
                   v-if="r.topics?.length"
                   class="muted"
                   style="display:flex; gap:6px; flex-wrap:wrap;"
                 >
                   <span class="badge" v-for="t in r.topics" :key="t">{{ t }}</span>
+                </div>
+
+                <!-- keywords_detected -->
+                <div
+                  v-if="r.keywords_detected?.length"
+                  class="muted"
+                  style="display:flex; gap:6px; flex-wrap:wrap;"
+                >
+                  <span class="chip chip--small" v-for="k in r.keywords_detected" :key="k">
+                    {{ k }}
+                  </span>
                 </div>
               </div>
             </td>
@@ -183,15 +205,10 @@ onMounted(fetchReviews);
               </span>
             </td>
 
-            <td class="code">
-              {{ r.score ?? "—" }}
-            </td>
+            <td class="code">{{ r.score ?? "—" }}</td>
 
-            <td class="muted">
-              {{ formatDate(r.created_at) }}
-            </td>
+            <td class="muted">{{ formatDate(r.created_at) }}</td>
 
-            <!-- Actions admin -->
             <td v-if="isAdmin">
               <button
                 class="btn"
@@ -211,3 +228,13 @@ onMounted(fetchReviews);
     </div>
   </div>
 </template>
+
+<style scoped>
+.chip--small {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+</style>

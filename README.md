@@ -196,7 +196,7 @@ For commercial usage, adaptation or resale, please contact the author.
 ---
 
 ## 👨‍💻 Author
-**Nabil Touinsi****Celia Lamari****Yanis Skalli**
+**Nabil Touinsi** **Celia Lamari** **Yanis Skalli**
 
 **Echo Reviews**  
 Designed & built as a full‑stack AI product with production standards.
@@ -204,3 +204,4 @@ Designed & built as a full‑stack AI product with production standards.
 ---
 
 > _From raw opinions to clear decisions — Echo Reviews._
+
